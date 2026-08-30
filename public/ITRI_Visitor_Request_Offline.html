@@ -345,7 +345,7 @@
           consentText:'我已閱讀並了解上述告知事項，並同意工研院於所述目的與範圍內蒐集、處理及利用我的個人資料。',
           submit:'完成登記', staffTools:'工作人員工具', exportCsv:'匯出 CSV', clearAll:'清除全部資料',
           sheetSyncTitle:'Google Sheet 安全同步', syncNow:'立即同步待傳資料',
-          syncReady:'同步服務已就緒。', syncNeedsHosting:'離線檔案會先保留資料；請透過已部署的安全網站開啟後同步。', syncWorking:'正在同步待傳資料…',
+          syncReady:'同步服務已就緒。', syncNeedsHosting:'離線檔案會先保留資料；請透過已部署的安全網站開啟後同步。', syncWorking:'正在同步待傳資料…', syncSubmitting:'正在安全傳送資料，請勿關閉頁面…',
           syncComplete:'同步完成。', syncFailed:'同步未完成，資料已保留，待網路恢復後可再次同步。',
           pendingUnit:'待同步',
           footer:'© Industrial Technology Research Institute. 本頁為展覽現場離線需求登記使用。',
@@ -355,7 +355,7 @@
           clearTitle:'確定清除全部登記資料？', clearMessage:'此動作無法復原。建議先匯出 CSV 備份。', cancel:'取消', confirmClear:'確認清除',
           errorRequest:'請至少選擇一項想索取的資訊，或填寫其他需求。', errorName:'請填寫姓名。',
           errorContact:'請至少填寫電子郵件或電話其中一項，方便我們回覆。', errorConsent:'請閱讀個人資料告知事項並勾選同意後再送出。',
-          errorStorage:'此瀏覽器無法儲存離線資料，請改用 Safari、Chrome 或 Edge 開啟本檔案。', countUnit:'筆',
+          errorStorage:'此瀏覽器無法儲存離線資料，請改用 Safari、Chrome 或 Edge 開啟本檔案。', errorSync:'資料已暫存於本裝置，但尚未同步至 Google Sheet。請確認網路後再按「立即同步待傳資料」。', countUnit:'筆',
           csvHeaders:['登記編號','登記時間','表單語言','展品','索取資訊','其他需求','留言','姓名','單位','部門','職稱','電子郵件','電話','偏好聯絡方式','期望回覆時間','個資同意'],
           csvYes:'是', csvLanguage:'中文', brochureFile:'FOUP式EUV劑量量測儀_中文版技術資料.jpeg'
         },
@@ -385,7 +385,7 @@
           consentText:'I have read and understood the notice above and consent to ITRI collecting, processing, and using my personal data for the stated purposes and within the stated scope.',
           submit:'Submit Request', staffTools:'Staff Tools', exportCsv:'Export CSV', clearAll:'Clear All Records',
           sheetSyncTitle:'Secure Google Sheet Sync', syncNow:'Sync Pending Records Now',
-          syncReady:'The secure sync service is ready.', syncNeedsHosting:'Offline records remain saved locally. Open the deployed secure site to sync them.', syncWorking:'Syncing pending records…',
+          syncReady:'The secure sync service is ready.', syncNeedsHosting:'Offline records remain saved locally. Open the deployed secure site to sync them.', syncWorking:'Syncing pending records…', syncSubmitting:'Sending your information securely. Please keep this page open…',
           syncComplete:'Sync complete.', syncFailed:'Sync was not completed. Records remain saved and can be retried when the network is available.',
           pendingUnit:'pending',
           footer:'© Industrial Technology Research Institute. This offline form is intended for exhibition visitor requests.',
@@ -395,7 +395,7 @@
           clearTitle:'Clear all visitor records?', clearMessage:'This action cannot be undone. We recommend exporting a CSV backup first.', cancel:'Cancel', confirmClear:'Clear Records',
           errorRequest:'Select at least one information item or enter another request.', errorName:'Please enter your name.',
           errorContact:'Enter at least an email address or phone number so we can respond.', errorConsent:'Read the personal data notice and provide consent before submitting.',
-          errorStorage:'This browser cannot save offline data. Please open this file in Safari, Chrome, or Edge.', countUnit:'records',
+          errorStorage:'This browser cannot save offline data. Please open this file in Safari, Chrome, or Edge.', errorSync:'Your information is saved on this device but has not yet reached Google Sheets. Please check the network and select “Sync Pending Records Now”.', countUnit:'records',
           csvHeaders:['Reference Number','Submitted At','Form Language','Exhibit','Requested Information','Other Request','Message','Name','Organization','Department','Job Title','Email','Phone','Preferred Contact Method','Preferred Response Time','Personal Data Consent'],
           csvYes:'Yes', csvLanguage:'English', brochureFile:'FOUP_Type_EUV_Dose_Wafer_Meter_English_Brochure.jpeg'
         }
@@ -544,7 +544,7 @@
       langEn.addEventListener('click', () => setLanguage('en'));
       consent.addEventListener('change', () => { submit.disabled = !consent.checked; });
 
-      form.addEventListener('submit', event => {
+      form.addEventListener('submit', async event => {
         event.preventDefault();
         error.classList.remove('show');
         const data = new FormData(form);
@@ -571,7 +571,19 @@
         };
         records.push(newRecord);
         if (!write(records)) return showError(t('errorStorage'));
-        syncRecord(newRecord).then(() => refreshCount());
+        submit.disabled = true;
+        const originalSubmitText = submit.textContent;
+        submit.textContent = t('syncSubmitting');
+        setSyncStatus('syncWorking');
+        const synced = await syncRecord(newRecord);
+        refreshCount();
+        if (!synced) {
+          submit.textContent = originalSubmitText;
+          submit.disabled = false;
+          setSyncStatus('syncFailed','warn');
+          return showError(t('errorSync'));
+        }
+        setSyncStatus('syncComplete','ok');
 
         document.getElementById('reference').textContent = id;
         const isZh = currentLang === 'zh';
